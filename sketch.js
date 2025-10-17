@@ -1,34 +1,33 @@
 let circles = [];
 let explosions = [];
-let popSound; // 🎵 新增：用來存放音效
+let popSound;
 let palette = [
-  [176, 66, 66, 204],   // #B04242
-  [224, 207, 186, 204], // #E0CFBA
-  [149, 45, 36, 204],   // #952D24
-  [168, 131, 122, 204]  // #A8837A
+  [176, 66, 66, 204],
+  [224, 207, 186, 204],
+  [149, 45, 36, 204],
+  [168, 131, 122, 204]
 ];
-let score = 0; // 新增：計分變數
 
 function preload() {
-  // 🎵 新增：載入音效（確保 MP3 檔放在與此程式同層資料夾中）
   popSound = loadSound('bubble-pop-06-351337.mp3');
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  background(115, 87, 81); // #735751
+  background(115, 87, 81);
 
-  // 產生60個圓
+  // 建立泡泡
   for (let i = 0; i < 60; i++) {
     let radius = random(50, 140);
     let c = random(palette);
     let speed = map(radius, 120, 260, 2, 6);
     circles.push({
       x: random(width),
-      y: random(height),
+      y: random(height, height * 1.5),
       r: radius,
       color: c,
-      speed: speed
+      speed: speed,
+      life: random(180, 600) // 每顆泡泡壽命（幀數）
     });
   }
 }
@@ -37,14 +36,11 @@ function draw() {
   background(115, 87, 81);
   noStroke();
 
-  // 右上角顯示分數
-  fill(255, 255, 255, 220);
-  textSize(36);
-  textAlign(RIGHT, TOP);
-  text("分數：" + score, width - 30, 20);
-
-  for (let i = 0; i < circles.length; i++) {
+  // 更新並畫泡泡
+  for (let i = circles.length - 1; i >= 0; i--) {
     let c = circles[i];
+
+    // 畫泡泡
     fill(c.color[0], c.color[1], c.color[2], c.color[3]);
     ellipse(c.x, c.y, c.r, c.r);
 
@@ -52,24 +48,25 @@ function draw() {
     let highlightSize = c.r * 0.15;
     let offset = c.r * 0.22;
     fill(255, 255, 255, 180);
-    rectMode(CENTER);
     push();
     translate(c.x, c.y);
+    rectMode(CENTER);
     rect(offset, -offset, highlightSize, highlightSize, highlightSize * 0.4);
     pop();
 
-    // 取消自動爆破，只保留移動與重生
+    // 漂浮
     c.y -= c.speed;
-    if (c.y + c.r / 2 < 0) {
-      c.r = random(50, 140);
-      c.speed = map(c.r, 120, 260, 2, 6);
-      c.y = height + c.r / 2;
-      c.x = random(width);
-      c.color = random(palette);
+    c.life--;
+
+    // 泡泡離開畫面或壽命到 → 爆炸
+    if (c.y + c.r / 2 < 0 || c.life <= 0) {
+      triggerExplosion(c.x, c.y, c.r, c.color);
+      circles.splice(i, 1);
+      spawnBubble();
     }
   }
 
-  // 畫爆破動畫
+  // 畫爆炸效果
   for (let i = explosions.length - 1; i >= 0; i--) {
     let e = explosions[i];
     let steps = 18;
@@ -93,34 +90,37 @@ function draw() {
   }
 }
 
+// 點擊泡泡 → 爆炸
 function mousePressed() {
-  for (let i = 0; i < circles.length; i++) {
+  for (let i = circles.length - 1; i >= 0; i--) {
     let c = circles[i];
     let d = dist(mouseX, mouseY, c.x, c.y);
     if (d < c.r / 2) {
-      explosions.push({
-        x: c.x,
-        y: c.y,
-        r: c.r,
-        color: c.color.slice(0, 3),
-        t: 0
-      });
-
-      // 🎵 播放音效
-      if (popSound && !popSound.isPlaying()) {
-        popSound.play();
-      }
-
-      // 計分加一
-      score++;
-
-      // 重新生成圓
-      c.r = random(50, 140);
-      c.speed = map(c.r, 120, 260, 2, 6);
-      c.y = height + c.r / 2;
-      c.x = random(width);
-      c.color = random(palette);
+      triggerExplosion(c.x, c.y, c.r, c.color);
+      circles.splice(i, 1);
+      spawnBubble();
       break;
     }
   }
+}
+
+// 🧨 爆炸動畫 + 聲音
+function triggerExplosion(x, y, r, color) {
+  explosions.push({ x: x, y: y, r: r, color: color.slice(0, 3), t: 0 });
+  if (popSound) popSound.play();
+}
+
+// 🎈 產生新泡泡
+function spawnBubble() {
+  let radius = random(50, 140);
+  let c = random(palette);
+  let speed = map(radius, 120, 260, 2, 6);
+  circles.push({
+    x: random(width),
+    y: height + radius,
+    r: radius,
+    color: c,
+    speed: speed,
+    life: random(180, 600)
+  });
 }
